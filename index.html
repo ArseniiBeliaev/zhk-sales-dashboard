@@ -71,7 +71,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1 id="title">Продажи ЖК</h1>
+  <h1>Продажи квартир в ЖК, март–сентябрь 2026</h1>
   <p class="sub">367 квартир в 6 корпусах, сделки со 2 марта по 30 сентября 2026. Все графики связаны: клик по строке справа, по корпусу или выделение недель внизу фильтрует остальные.</p>
 
   <div class="facts" id="facts"></div>
@@ -92,7 +92,7 @@
       </div>
       <div class="card">
         <h2>Сделки по неделям</h2>
-        <div class="note" id="weeksNote">Выделите мышью диапазон недель, чтобы отфильтровать.</div>
+        <div class="note">Штриховка — сделки со скидкой, линия — среднее за 4 недели. Выделите мышью диапазон недель, чтобы отфильтровать.</div>
         <div id="weeks"></div>
       </div>
     </div>
@@ -194,18 +194,6 @@ function flatTip(f) {
   } else s += '<b>Не продана</b>';
   return s;
 }
-
-// ---------- заголовок: вывод из данных ----------
-(function title() {
-  const sold = flats.filter((f) => f.sold);
-  const disc = d3.sum(sold, (f) => f.disc);
-  const byM = d3.rollups(sold, (v) => d3.sum(v, (f) => f.disc), (f) => f.mgr).sort((a, b) => b[1] - a[1]);
-  const top = byM[0];
-  const last8 = sold.filter((f) => f.week >= NWEEKS - 8).length / 8;
-  document.getElementById('title').textContent =
-    `ЖК продан на ${pct(sold.length / flats.length)}, темп ровный — около ${Math.round(last8)} квартир в неделю; ` +
-    `${pct(top[1] / disc)} всех скидок дал один менеджер — ${top[0]}`;
-})();
 
 // ---------- фактоиды ----------
 function renderFacts() {
@@ -391,8 +379,6 @@ function renderWeeks() {
 
   svg.append('path').datum(data).attr('fill', 'none').attr('stroke', '#111827').attr('stroke-width', 1.6)
     .attr('d', d3.line().x((d) => x(d.i) + x.bandwidth() / 2).y((d) => y(d.avg)).curve(d3.curveMonotoneX));
-  svg.append('text').attr('x', width - m.right).attr('y', m.top + 2).attr('text-anchor', 'end').attr('fill', '#111827')
-    .style('font-size', '11px').text('— среднее за 4 недели');
 
   // кисть для выбора недель
   const brush = d3.brushX().extent([[m.left, m.top], [width - m.right, height - m.bottom]])
@@ -415,11 +401,6 @@ function renderWeeks() {
       (d.lost ? `<br>Скидки: ${mln(d.lost)}` : ''));
   }).on('mouseleave.tip', hideTip);
 
-  // подпись: что происходит с продажами
-  const first = d3.sum(data.slice(0, 8), (d) => d.n) / 8, last = d3.sum(data.slice(-8), (d) => d.n) / 8;
-  const trend = last > first * 1.15 ? 'ускоряются' : last < first * 0.85 ? 'замедляются' : 'идут ровно';
-  d3.select('#weeksNote').html(`Продажи ${trend}: ${ru.format(',.1f')(first)} кв./нед. в первые 8 недель и ${ru.format(',.1f')(last)} — в последние 8. ` +
-    `Штриховка — сделки со скидкой. Выделите мышью диапазон недель, чтобы отфильтровать.`);
 }
 
 // ---------- срез: строки со столбиком продано/осталось ----------
