@@ -89,7 +89,7 @@
       <div class="card">
         <h2 id="schemeTitle">Схема корпусов: какие квартиры проданы</h2>
         <div class="note" id="noteFlats">Одна ячейка — одна квартира: строка — этаж, ширина — площадь, цифра — число комнат. Наведите, чтобы увидеть квартиру; клик по названию корпуса — фильтр.</div>
-        <div class="note" id="notePlan" hidden>Цвет стороны — доля проданных квартир с таким видом за весь период. Схема условная: расположение корпусов восстановлено по сочетаниям видов в данных, координат в выгрузке нет. Клик по корпусу — фильтр.</div>
+        <div class="note" id="notePlan" hidden>Цвет стороны — доля проданных квартир с таким видом; считается по текущему фильтру. Схема условная: расположение корпусов восстановлено по сочетаниям видов в данных, координат в выгрузке нет. Клик по корпусу — фильтр.</div>
         <label class="toggle"><input type="checkbox" id="planOn">Показать генплан</label>
         <div class="legend" id="legendFlats">
           <span><i style="background:var(--sold)"></i>Продана</span>
@@ -98,7 +98,7 @@
           <span><i style="background:var(--fade)"></i>Не входит в фильтр</span>
         </div>
         <div class="legend" id="legendPlan" hidden>
-          <span>Продано:</span>
+          <span id="legendLabel">Продано:</span>
           <span><svg width="150" height="11"><defs><linearGradient id="ramp"><stop offset="0" stop-color="#dce9f7"/><stop offset="1" stop-color="#0b3b73"/></linearGradient></defs><rect width="150" height="11" rx="2" fill="url(#ramp)"/></svg></span>
           <span>30% → 100%</span>
         </div>
@@ -506,6 +506,11 @@ function renderPlan() {
   const svg = el.append('svg').attr('viewBox', `0 0 ${PW} ${PH}`).attr('width', '100%')
     .attr('height', Math.round(Math.max(el.node().clientWidth, 560) * PH / PW));
   const shade = d3.scaleLinear().domain([0.3, 1]).range(['#dce9f7', '#0b3b73']).clamp(true);
+  // знаменатель — квартиры, подходящие по комнатности и виду: фильтры по менеджеру и неделям
+  // оставляют только проданные, поэтому их в знаменателе не учитываем
+  const inBase = (f) => (S.rooms == null || f.rooms === S.rooms) && (S.view == null || f.view === S.view);
+  const inSel = (f) => f.sold && match(f, 'b');
+  document.getElementById('legendLabel').textContent = saleFilterOn() ? 'Продано в срезе:' : 'Продано:';
 
   // окружение
   const env = svg.append('g');
@@ -525,7 +530,8 @@ function renderPlan() {
   cap(410, 215, 'двор', '#9aa2ad');
 
   Object.entries(PLAN).forEach(([name, b]) => {
-    const all = flats.filter((f) => f.b === name);
+    const base = flats.filter((f) => f.b === name && inBase(f));
+    const sel = base.filter(inSel);
     const g = svg.append('g').attr('class', 'bldg')
       .attr('opacity', S.b && S.b !== name ? 0.35 : 1)
       .on('click', () => toggle('b', name));
@@ -533,9 +539,9 @@ function renderPlan() {
       .attr('fill', '#f7f8fa').attr('stroke', '#ccd1d8').attr('rx', 3);
 
     Object.entries(b.sides).forEach(([pos, token]) => {
-      const items = all.filter((f) => sidesOf(f.view).includes(token));
-      if (!items.length) return;
-      const sold = items.filter((f) => f.sold), share = sold.length / items.length;
+      const onSide = (f) => sidesOf(f.view).includes(token);
+      const items = base.filter(onSide), sold = sel.filter(onSide);
+      const share = items.length ? sold.length / items.length : null;
       const box = {
         top:    [b.x + 1, b.y + 1, b.w - 2, PT],
         bottom: [b.x + 1, b.y + b.h - PT - 1, b.w - 2, PT],
@@ -543,10 +549,11 @@ function renderPlan() {
         right:  [b.x + b.w - PT - 1, b.y + 1, PT, b.h - 2],
       }[pos];
       g.append('rect').attr('x', box[0]).attr('y', box[1]).attr('width', box[2]).attr('height', box[3])
-        .attr('fill', shade(share))
-        .on('mousemove', (ev) => showTip(ev, `<b>${name}, вид ${SIDE_NAME[token]}</b><br>Квартир: ${items.length}` +
-          `<br>Продано: ${sold.length} (${pct(share)})` +
-          (median(sold.map((f) => f.days)) != null ? `<br>Медиана дней: ${fDays(median(sold.map((f) => f.days)))}` : '') +
+        .attr('fill', share == null ? 'var(--fade)' : shade(share))
+        .on('mousemove', (ev) => showTip(ev, `<b>${name}, вид ${SIDE_NAME[token]}</b>` +
+          (share == null ? '<br>Нет квартир в текущем фильтре'
+            : `<br>Квартир на стороне: ${items.length}<br>${saleFilterOn() ? 'Продано в срезе' : 'Продано'}: ${sold.length} (${pct(share)})` +
+              (median(sold.map((f) => f.days)) != null ? `<br>Медиана дней: ${fDays(median(sold.map((f) => f.days)))}` : '')) +
           '<br>Клик — фильтр по корпусу'))
         .on('mouseleave', hideTip);
 
@@ -557,14 +564,14 @@ function renderPlan() {
         .attr('dy', horiz ? 0 : '0.32em')
         .attr('text-anchor', horiz ? 'middle' : (pos === 'left' ? 'end' : 'start'))
         .attr('fill', 'var(--muted)').style('font-size', '11px').style('font-variant-numeric', 'tabular-nums')
-        .text(pct(share));
+        .text(share == null ? '—' : pct(share));
     });
 
     g.append('text').attr('x', b.x + b.w / 2).attr('y', b.y + b.h / 2 - 3).attr('text-anchor', 'middle')
       .style('font-size', '14px').style('font-weight', '600').text(name);
     g.append('text').attr('x', b.x + b.w / 2).attr('y', b.y + b.h / 2 + 14).attr('text-anchor', 'middle')
       .attr('fill', 'var(--muted)').style('font-size', '11px')
-      .text(`${all.filter((f) => f.sold).length}/${all.length}`);
+      .text(`${sel.length}/${base.length}`);
   });
 }
 
