@@ -15,7 +15,7 @@
     --line: #e5e7eb;
     --bg: #f4f5f7;
     --card: #ffffff;
-    --accent: #c2410c;
+    --accent: #c2410c; --good: #0f7a43;
   }
   * { box-sizing: border-box; }
   body {
@@ -68,6 +68,7 @@
   .mtab tr.dim td { color: #b6bcc6; }
   .bar { display: inline-block; height: 8px; background: var(--sold); border-radius: 2px; vertical-align: middle; margin-right: 4px; }
   .hot { color: var(--accent); font-weight: 600; }
+  .cool { color: var(--good); font-weight: 600; }
   [hidden] { display: none !important; }
   .toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--muted); font-size: 12px; margin-bottom: 8px; }
   .toggle input { cursor: pointer; margin: 0; }
@@ -124,7 +125,7 @@
       </div>
       <div class="card">
         <h2>Менеджеры</h2>
-        <div class="note">Скидки — сколько денег отдано клиентам. Оранжевым — заметно хуже остальных.</div>
+        <div class="note">Скидки — сколько денег отдано клиентам. Оранжевым — заметно хуже остальных, зелёным — заметно лучше: есть за что премировать.</div>
         <div id="mgrs"></div>
       </div>
       <div class="card">
@@ -470,15 +471,20 @@ function renderMgrs() {
   const maxC = d3.max(rows, (r) => r.cnt) || 1;
   const medLost = d3.median(rows.filter((r) => r.cnt), (r) => r.lostPct) || 0;
   const medDays = d3.median(rows.filter((r) => r.cnt), (r) => r.days) || 0;
+  // хуже медианы вдвое — оранжевый, лучше медианы вдвое — зелёный; для дней коэффициент 1,4
+  const lostCls = (r) => (!r.cnt ? '' : r.lostPct > medLost * 2 && r.lost > 0 ? 'hot'
+    : r.lostPct < medLost / 2 ? 'cool' : '');
+  const daysCls = (r) => (r.days == null ? '' : r.days > medDays * 1.4 ? 'hot'
+    : r.days < medDays / 1.4 ? 'cool' : '');
   const html = `<table class="mtab"><thead><tr><th>Менеджер</th><th style="text-align:left">Сделок</th><th>Выручка</th>
     <th>Скидки</th><th>% прайса</th><th>Дней</th></tr></thead><tbody>` +
     rows.map((r) => `<tr data-n="${r.n}" class="${S.mgr === r.n ? 'sel' : S.mgr ? 'dim' : ''}">
       <td>${r.n}</td>
       <td style="text-align:left"><span class="bar" style="width:${Math.round((r.cnt / maxC) * 32)}px"></span>${r.cnt}</td>
       <td>${r.cnt ? ru.format(',.2f')(r.rev / 1e9) : '—'}</td>
-      <td class="${r.lostPct > medLost * 2 && r.lost > 0 ? 'hot' : ''}">${r.cnt ? ru.format(',.1f')(r.lost / 1e6) : '—'}</td>
-      <td class="${r.lostPct > medLost * 2 && r.lost > 0 ? 'hot' : ''}">${r.cnt ? ru.format('.1%')(r.lostPct) : '—'}</td>
-      <td class="${r.days != null && r.days > medDays * 1.4 ? 'hot' : ''}">${fDays(r.days)}</td></tr>`).join('') +
+      <td class="${lostCls(r)}">${r.cnt ? ru.format(',.1f')(r.lost / 1e6) : '—'}</td>
+      <td class="${lostCls(r)}">${r.cnt ? ru.format('.1%')(r.lostPct) : '—'}</td>
+      <td class="${daysCls(r)}">${fDays(r.days)}</td></tr>`).join('') +
     `</tbody></table><div class="note" style="margin:6px 0 0">Выручка — млрд ₽, скидки — млн ₽, дни — медиана от обращения до сделки.</div>`;
   d3.select('#mgrs').html(html).selectAll('tbody tr').on('click', function () { toggle('mgr', this.dataset.n); });
 }
