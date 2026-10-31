@@ -6,7 +6,8 @@
 <title>Продажи ЖК, март–сентябрь 2026</title>
 <style>
   :root {
-    --sold: #2a78d6;
+    --sold: #5b9ee6;
+    --disc: #0f3b7d;
     --free: #eb6834;
     --fade: #e4e7ec;
     --text: #1f2328;
@@ -37,7 +38,7 @@
   .chip::after { content: " ×"; }
   .hint { color: var(--muted); }
   button.reset { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; }
-  .grid { display: grid; grid-template-columns: minmax(0, 2.3fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+  .grid { display: grid; grid-template-columns: minmax(0, 2.3fr) minmax(360px, 1fr); gap: 16px; align-items: start; }
   .card { background: var(--card); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
   .card h2 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
   .card .note { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
@@ -55,16 +56,17 @@
     border-radius: 6px; font-size: 12px; line-height: 1.45; max-width: 300px; opacity: 0; transition: opacity .1s; z-index: 10;
   }
   #tip b { font-weight: 600; }
-  .mtab { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-  .mtab th { text-align: right; font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 4px 6px; border-bottom: 1px solid var(--line); }
+  .mtab { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; font-size: 12px; }
+  #mgrs { overflow-x: auto; }
+  .mtab th { text-align: right; font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 3px 6px; white-space: nowrap; border-bottom: 1px solid var(--line); }
   .mtab th:first-child { text-align: left; }
-  .mtab td { text-align: right; white-space: nowrap; padding: 5px 4px; border-bottom: 1px solid #f1f2f4; }
-  .mtab td:first-child { text-align: left; white-space: nowrap; }
+  .mtab td { text-align: right; white-space: nowrap; padding: 5px 2px; border-bottom: 1px solid #f1f2f4; }
+  .mtab td:first-child { text-align: left; white-space: normal; line-height: 1.2; }
   .mtab tr { cursor: pointer; }
   .mtab tbody tr:hover { background: #f3f4f6; }
   .mtab tr.sel { background: #dbeafe; }
   .mtab tr.dim td { color: #b6bcc6; }
-  .bar { display: inline-block; height: 9px; background: var(--sold); border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .bar { display: inline-block; height: 8px; background: var(--sold); border-radius: 2px; vertical-align: middle; margin-right: 4px; }
   .hot { color: var(--accent); font-weight: 600; }
   @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
 </style>
@@ -81,10 +83,10 @@
     <div>
       <div class="card">
         <h2>Схема корпусов: какие квартиры проданы</h2>
-        <div class="note">Одна ячейка — одна квартира: столбец — планировка, строка — этаж. Наведите, чтобы увидеть квартиру; клик по названию корпуса — фильтр.</div>
+        <div class="note">Одна ячейка — одна квартира: строка — этаж, ширина — площадь, цифра — число комнат. Наведите, чтобы увидеть квартиру; клик по названию корпуса — фильтр.</div>
         <div class="legend">
           <span><i style="background:var(--sold)"></i>Продана</span>
-          <span><i style="background:repeating-linear-gradient(135deg,var(--sold) 0 4px,#fff 4px 5.5px)"></i>Продана со скидкой</span>
+          <span><i style="background:var(--disc)"></i>Продана со скидкой</span>
           <span><i style="background:var(--free)"></i>Не продана</span>
           <span><i style="background:var(--fade)"></i>Не входит в фильтр</span>
         </div>
@@ -92,7 +94,7 @@
       </div>
       <div class="card">
         <h2>Сделки по неделям</h2>
-        <div class="note">Штриховка — сделки со скидкой, линия — среднее за 4 недели. Выделите мышью диапазон недель, чтобы отфильтровать.</div>
+        <div class="note">Тёмно-синим — сделки со скидкой, жёлтая линия — среднее за 4 недели. Выделите мышью диапазон недель, чтобы отфильтровать.</div>
         <div id="weeks"></div>
       </div>
     </div>
@@ -240,36 +242,34 @@ function renderFilters() {
 }
 
 // ---------- основной график: схема корпусов ----------
+// Квартиры на этаже идут по порядку номеров, ширина пропорциональна площади:
+// планировки на разных этажах нарезаны по-разному, но площадь этажа одна и та же.
 const buildings = d3.groups(flats, (f) => f.b).sort((a, b) => d3.ascending(a[0], b[0])).map(([name, items]) => {
-  const layouts = d3.groups(items, (f) => f.layout)
-    .map(([layout, v]) => ({layout, rooms: v[0].rooms, area: v[0].area}))
-    .sort((a, b) => a.rooms - b.rooms || a.area - b.area || a.layout.localeCompare(b.layout));
-  const col = new Map(layouts.map((l, i) => [l.layout, i]));
-  items.forEach((f) => (f.col = col.get(f.layout)));
-  const groups = [];
-  layouts.forEach((l, i) => {
-    const last = groups[groups.length - 1];
-    if (last && last.rooms === l.rooms) last.to = i; else groups.push({rooms: l.rooms, from: i, to: i});
+  items.forEach((f) => (f.num = +f.id.split('-').pop()));
+  const floors = d3.groups(items, (f) => f.fl).map(([fl, v]) => {
+    v.sort((a, b) => a.num - b.num);
+    let acc = 0;
+    v.forEach((f) => { f.off = acc; acc += f.area; });
+    return {fl, area: acc};
   });
-  return {name, items, layouts, groups, maxFloor: d3.max(items, (f) => f.fl)};
+  return {name, items, area: d3.max(floors, (f) => f.area), maxFloor: d3.max(items, (f) => f.fl)};
 });
 const MINF = d3.min(flats, (f) => f.fl), MAXF = d3.max(flats, (f) => f.fl);
+const cellColor = (f) => (!f.sold ? 'var(--free)' : f.disc > 0 ? 'var(--disc)' : 'var(--sold)');
 
 function renderScheme() {
   const el = document.getElementById('scheme');
   const width = Math.max(el.clientWidth, 700);
-  const m = {top: 40, right: 4, bottom: 46, left: 30}, gap = 18;
-  const nCols = d3.sum(buildings, (b) => b.layouts.length);
-  const cw = Math.floor((width - m.left - m.right - gap * (buildings.length - 1)) / nCols);
+  const m = {top: 40, right: 4, bottom: 8, left: 30}, gap = 16;
+  const k = (width - m.left - m.right - gap * (buildings.length - 1)) / d3.sum(buildings, (b) => b.area); // px на м²
   const nF = MAXF - MINF + 1;
-  const ch = Math.max(8, Math.min(16, Math.round(cw * 0.55)));
-  const height = m.top + nF * ch + m.bottom;
+  const ch = Math.max(10, Math.min(17, Math.round(k * 32)));
   const baseY = m.top + nF * ch;
+  const height = baseY + m.bottom;
   const fy = (fl) => baseY - (fl - MINF + 1) * ch;
 
   const svg = d3.select(el).html('').append('svg').attr('width', width).attr('height', height);
 
-  // этажи
   const ax = svg.append('g').attr('fill', 'var(--muted)').style('font-size', '10px');
   ax.append('text').attr('x', m.left - 6).attr('y', m.top - 6).attr('text-anchor', 'end').text('этаж');
   for (let fl = MINF; fl <= MAXF; fl++) {
@@ -282,17 +282,14 @@ function renderScheme() {
 
   let x0 = m.left;
   buildings.forEach((b) => {
-    const bw = b.layouts.length * cw;
+    const bw = b.area * k;
     const top = fy(b.maxFloor);
     const g = svg.append('g').attr('transform', `translate(${x0},0)`);
-    const inF = b.items.filter((f) => match(f, 'b'));
-    const soldF = inF.filter((f) => f.sold).length;
+    const soldF = b.items.filter((f) => f.sold && match(f, 'b')).length;
     const isSel = S.b === b.name, dim = S.b != null && !isSel;
 
-    g.append('rect').attr('x', 0).attr('y', top).attr('width', bw).attr('height', baseY - top)
-      .attr('fill', isSel ? '#eef4ff' : '#fafafa').attr('stroke', isSel ? 'var(--sold)' : 'var(--line)').attr('rx', 2);
-    g.append('path').attr('d', `M0 ${top} L5 ${top - 6} L${bw - 5} ${top - 6} L${bw} ${top}`)
-      .attr('fill', 'none').attr('stroke', isSel ? 'var(--sold)' : 'var(--line)');
+    g.append('path').attr('d', `M-1 ${top} L4 ${top - 6} L${bw - 4} ${top - 6} L${bw + 1} ${top}`)
+      .attr('fill', 'none').attr('stroke', isSel ? 'var(--sold)' : '#cbd0d8');
 
     const all = b.items.length, allSold = b.items.filter((f) => f.sold).length;
     const head = g.append('g').attr('class', 'bhead').on('click', () => toggle('b', b.name));
@@ -307,28 +304,18 @@ function renderScheme() {
 
     b.items.forEach((f) => {
       const on = match(f) && (f.sold || !saleFilterOn());
-      const x = f.col * cw + 1, y = fy(f.fl) + 1, w = cw - 2, h = ch - 2;
+      const x = f.off * k + 0.5, y = fy(f.fl) + 0.5, w = f.area * k - 1, h = ch - 1;
       const c = g.append('g').on('mousemove', (ev) => showTip(ev, flatTip(f))).on('mouseleave', hideTip);
-      c.append('rect').attr('x', x).attr('y', y).attr('width', w).attr('height', h).attr('rx', Math.min(3, h / 3))
-        .attr('fill', on ? (f.sold ? 'var(--sold)' : 'var(--free)') : 'var(--fade)');
-      if (on && f.disc > 0) {
-        c.append('line').attr('x1', x + 2).attr('y1', y + h - 2).attr('x2', x + w - 2).attr('y2', y + 2)
-          .attr('stroke', '#fff').attr('stroke-width', 1.5).attr('stroke-linecap', 'round').attr('pointer-events', 'none');
+      c.append('rect').attr('x', x).attr('y', y).attr('width', w).attr('height', h)
+        .attr('fill', on ? cellColor(f) : 'var(--fade)');
+      if (w >= 9 && h >= 10) {
+        c.append('text').attr('x', x + w / 2).attr('y', y + h / 2).attr('dy', '0.35em').attr('text-anchor', 'middle')
+          .attr('fill', on ? '#fff' : '#a3a9b3').attr('pointer-events', 'none').style('font-size', h >= 14 ? '10px' : '9px')
+          .style('font-weight', 600).text(f.rooms);
       }
-    });
-
-    b.layouts.forEach((l, i) => g.append('text').attr('x', i * cw + cw / 2).attr('y', baseY + 13)
-      .attr('text-anchor', 'middle').attr('fill', 'var(--muted)').style('font-size', cw < 22 ? '9px' : '10px').text(Math.round(l.area)));
-    b.groups.forEach((gr) => {
-      const a = gr.from * cw + 1, z = (gr.to + 1) * cw - 1, y = baseY + 22;
-      g.append('path').attr('d', `M${a} ${y} L${a} ${y + 5} L${z} ${y + 5} L${z} ${y}`).attr('fill', 'none').attr('stroke', '#cbd0d8');
-      g.append('text').attr('x', (a + z) / 2).attr('y', y + 17).attr('text-anchor', 'middle').attr('fill', 'var(--muted)')
-        .style('font-size', '10px').text(z - a < 40 ? `${gr.rooms}к` : `${gr.rooms}-комн.`);
     });
     x0 += bw + gap;
   });
-  svg.append('text').attr('x', m.left - 6).attr('y', baseY + 13).attr('text-anchor', 'end').attr('fill', 'var(--muted)')
-    .style('font-size', '10px').text('м²');
 }
 
 // ---------- динамика по неделям ----------
@@ -351,8 +338,6 @@ function renderWeeks() {
   const y = d3.scaleLinear().domain([0, Math.max(4, d3.max(data, (d) => d.n))]).nice().range([height - m.bottom, m.top]);
   const svg = d3.select(el).html('').append('svg').attr('width', width).attr('height', height);
 
-  svg.append('defs').html(`<pattern id="hatch" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">
-    <rect width="5" height="5" fill="#2a78d6"/><line x1="0" y1="0" x2="0" y2="5" stroke="#fff" stroke-width="1.6"/></pattern>`);
 
   svg.append('g').attr('transform', `translate(${m.left},0)`)
     .call(d3.axisLeft(y).ticks(4).tickSize(-(width - m.left - m.right)))
@@ -375,9 +360,9 @@ function renderWeeks() {
   bars.append('rect').attr('x', (d) => x(d.i)).attr('width', x.bandwidth())
     .attr('y', (d) => y(d.plain)).attr('height', (d) => y(0) - y(d.plain)).attr('fill', 'var(--sold)');
   bars.append('rect').attr('x', (d) => x(d.i)).attr('width', x.bandwidth())
-    .attr('y', (d) => y(d.n)).attr('height', (d) => y(d.plain) - y(d.n)).attr('fill', 'url(#hatch)');
+    .attr('y', (d) => y(d.n)).attr('height', (d) => y(d.plain) - y(d.n)).attr('fill', 'var(--disc)');
 
-  svg.append('path').datum(data).attr('fill', 'none').attr('stroke', '#111827').attr('stroke-width', 1.6)
+  svg.append('path').datum(data).attr('fill', 'none').attr('stroke', '#e0a100').attr('stroke-width', 2)
     .attr('d', d3.line().x((d) => x(d.i) + x.bandwidth() / 2).y((d) => y(d.avg)).curve(d3.curveMonotoneX));
 
   // кисть для выбора недель
@@ -435,7 +420,7 @@ function sliceRows(elId, key, cats, labelOf) {
     .text((r) => labelOf(r.c));
   const bx = labelW;
   g.append('rect').attr('x', bx).attr('y', 5).attr('height', rowH - 12).attr('width', (r) => x(r.plain)).attr('fill', 'var(--sold)').attr('opacity', (r) => (dim(r) ? 0.35 : 1));
-  g.append('rect').attr('x', (r) => bx + x(r.plain)).attr('y', 5).attr('height', rowH - 12).attr('width', (r) => x(r.disc)).attr('fill', 'url(#hatch)').attr('opacity', (r) => (dim(r) ? 0.35 : 1));
+  g.append('rect').attr('x', (r) => bx + x(r.plain)).attr('y', 5).attr('height', rowH - 12).attr('width', (r) => x(r.disc)).attr('fill', 'var(--disc)').attr('opacity', (r) => (dim(r) ? 0.35 : 1));
   g.append('rect').attr('x', (r) => bx + x(r.sold)).attr('y', 5).attr('height', rowH - 12).attr('width', (r) => x(r.free)).attr('fill', 'var(--free)').attr('opacity', (r) => (dim(r) ? 0.35 : 1));
   g.append('text').attr('x', width - 4).attr('y', rowH / 2).attr('dy', '0.32em').attr('text-anchor', 'end')
     .attr('fill', (r) => (r.share < 0.6 ? 'var(--accent)' : 'var(--muted)')).style('font-variant-numeric', 'tabular-nums')
@@ -457,10 +442,10 @@ function renderMgrs() {
   const medLost = d3.median(rows.filter((r) => r.cnt), (r) => r.lostPct) || 0;
   const medDays = d3.median(rows.filter((r) => r.cnt), (r) => r.days) || 0;
   const html = `<table class="mtab"><thead><tr><th>Менеджер</th><th style="text-align:left">Сделок</th><th>Выручка</th>
-    <th>Скидки</th><th>% от прайса</th><th>Дней</th></tr></thead><tbody>` +
+    <th>Скидки</th><th>% прайса</th><th>Дней</th></tr></thead><tbody>` +
     rows.map((r) => `<tr data-n="${r.n}" class="${S.mgr === r.n ? 'sel' : S.mgr ? 'dim' : ''}">
       <td>${r.n}</td>
-      <td style="text-align:left"><span class="bar" style="width:${Math.round((r.cnt / maxC) * 60)}px"></span>${r.cnt}</td>
+      <td style="text-align:left"><span class="bar" style="width:${Math.round((r.cnt / maxC) * 32)}px"></span>${r.cnt}</td>
       <td>${r.cnt ? ru.format(',.2f')(r.rev / 1e9) : '—'}</td>
       <td class="${r.lostPct > medLost * 2 && r.lost > 0 ? 'hot' : ''}">${r.cnt ? ru.format(',.1f')(r.lost / 1e6) : '—'}</td>
       <td class="${r.lostPct > medLost * 2 && r.lost > 0 ? 'hot' : ''}">${r.cnt ? ru.format('.1%')(r.lostPct) : '—'}</td>
@@ -475,7 +460,7 @@ function renderAll() {
   hideTip();
   renderFacts();
   renderFilters();
-  renderWeeks(); // тут же объявлен паттерн штриховки
+  renderWeeks();
   renderScheme();
   sliceRows('rooms', 'rooms', [1, 2, 3, 4], (c) => ROOMS_LABEL[c]);
   renderMgrs();
