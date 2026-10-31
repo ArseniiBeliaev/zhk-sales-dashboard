@@ -392,7 +392,11 @@ function renderWeeks() {
 function sliceRows(elId, key, cats, labelOf) {
   const el = document.getElementById(elId);
   const width = Math.max(el.clientWidth, 300);
-  const rowH = 24, labelW = Math.min(150, width * 0.4), right = 92;
+  // ширина подписей — по самой длинной подписи
+  const meas = d3.select('body').append('svg').style('position', 'absolute').style('visibility', 'hidden');
+  const textW = d3.max(cats, (c) => meas.append('text').style('font-size', '13px').text(labelOf(c)).node().getComputedTextLength());
+  meas.remove();
+  const rowH = 24, labelW = Math.min(Math.ceil(textW) + 14, width * 0.45), right = 86;
   const rows = cats.map((c) => {
     const items = flats.filter((f) => f[key] === c && match(f, key));
     const sold = items.filter((f) => f.sold);
@@ -403,7 +407,7 @@ function sliceRows(elId, key, cats, labelOf) {
   });
   const maxN = d3.max(rows, (r) => r.sold + r.free) || 1;
   const x = d3.scaleLinear().domain([0, maxN]).range([0, width - labelW - right]);
-  const svg = d3.select(el).html('').append('svg').attr('width', width).attr('height', rows.length * rowH + 18);
+  const svg = d3.select(el).html('').append('svg').attr('width', width).attr('height', rows.length * rowH + 18).style('overflow', 'visible');
   svg.append('text').attr('x', width).attr('y', 10).attr('text-anchor', 'end').attr('fill', 'var(--muted)').style('font-size', '10px')
     .text('продано · медиана дн.');
   const g = svg.selectAll('.row').data(rows).join('g')
@@ -415,14 +419,14 @@ function sliceRows(elId, key, cats, labelOf) {
       (r.days != null ? `<br>Медиана дней до сделки: ${fDays(r.days)}` : '') + '<br>Клик — фильтр'))
     .on('mouseleave', hideTip);
   const dim = (r) => S[key] != null && S[key] !== r.c;
-  g.append('rect').attr('class', 'rowbg').attr('width', width).attr('height', rowH - 2).attr('fill', 'transparent').attr('rx', 3);
-  g.append('text').attr('x', 4).attr('y', rowH / 2).attr('dy', '0.32em').attr('fill', (r) => (dim(r) ? '#9ca3af' : 'var(--text)'))
+  g.append('rect').attr('class', 'rowbg').attr('x', -6).attr('width', width + 12).attr('height', rowH - 2).attr('fill', 'transparent').attr('rx', 3);
+  g.append('text').attr('x', 0).attr('y', rowH / 2).attr('dy', '0.32em').attr('fill', (r) => (dim(r) ? '#9ca3af' : 'var(--text)'))
     .text((r) => labelOf(r.c));
   const bx = labelW;
   g.append('rect').attr('x', bx).attr('y', 5).attr('height', rowH - 12).attr('width', (r) => x(r.plain)).attr('fill', 'var(--sold)').attr('opacity', (r) => (dim(r) ? 0.35 : 1));
   g.append('rect').attr('x', (r) => bx + x(r.plain)).attr('y', 5).attr('height', rowH - 12).attr('width', (r) => x(r.disc)).attr('fill', 'var(--disc)').attr('opacity', (r) => (dim(r) ? 0.35 : 1));
   g.append('rect').attr('x', (r) => bx + x(r.sold)).attr('y', 5).attr('height', rowH - 12).attr('width', (r) => x(r.free)).attr('fill', 'var(--free)').attr('opacity', (r) => (dim(r) ? 0.35 : 1));
-  g.append('text').attr('x', width - 4).attr('y', rowH / 2).attr('dy', '0.32em').attr('text-anchor', 'end')
+  g.append('text').attr('x', width).attr('y', rowH / 2).attr('dy', '0.32em').attr('text-anchor', 'end')
     .attr('fill', (r) => (r.share < 0.6 ? 'var(--accent)' : 'var(--muted)')).style('font-variant-numeric', 'tabular-nums')
     .text((r) => `${pct(r.share)} · ${fDays(r.days)}`);
 }
