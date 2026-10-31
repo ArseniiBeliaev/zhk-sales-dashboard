@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Продажи ЖК, март–сентябрь 2026</title>
+<style>
+  :root {
+    --sold: #2a78d6;
+    --free: #eb6834;
+    --fade: #e4e7ec;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --line: #e5e7eb;
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --accent: #c2410c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  .wrap { max-width: 1600px; margin: 0 auto; padding: 20px 24px 32px; }
+  h1 { font-size: 22px; margin: 0 0 4px; font-weight: 700; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 8px 36px; margin-bottom: 16px; }
+  .fact .lbl { color: var(--muted); font-size: 12px; }
+  .fact .val { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .fact .val small { font-size: 13px; font-weight: 400; color: var(--muted); }
+  .fact.warn .val { color: var(--accent); }
+  .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 28px; margin-bottom: 12px; }
+  .chip { background: #dbeafe; color: #1e3a8a; border-radius: 14px; padding: 3px 10px; cursor: pointer; }
+  .chip:hover { background: #bfdbfe; }
+  .chip::after { content: " ×"; }
+  .hint { color: var(--muted); }
+  button.reset { border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 4px 10px; cursor: pointer; font: inherit; }
+  .grid { display: grid; grid-template-columns: minmax(0, 2.3fr) minmax(320px, 1fr); gap: 16px; align-items: start; }
+  .card { background: var(--card); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 2px; font-weight: 600; }
+  .card .note { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 14px; height: 11px; border-radius: 2px; }
+  svg text { font-family: inherit; }
+  .row { cursor: pointer; }
+  .row:hover .rowbg { fill: #f3f4f6; }
+  .row.sel .rowbg { fill: #dbeafe; }
+  .bhead { cursor: pointer; }
+  .bhead:hover text:first-child { text-decoration: underline; }
+  #tip {
+    position: fixed; pointer-events: none; background: #111827; color: #fff; padding: 8px 10px;
+    border-radius: 6px; font-size: 12px; line-height: 1.45; max-width: 300px; opacity: 0; transition: opacity .1s; z-index: 10;
+  }
+  #tip b { font-weight: 600; }
+  .mtab { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  .mtab th { text-align: right; font-weight: 500; color: var(--muted); font-size: 11px; padding: 2px 4px 6px; border-bottom: 1px solid var(--line); }
+  .mtab th:first-child { text-align: left; }
+  .mtab td { text-align: right; white-space: nowrap; padding: 5px 4px; border-bottom: 1px solid #f1f2f4; }
+  .mtab td:first-child { text-align: left; white-space: nowrap; }
+  .mtab tr { cursor: pointer; }
+  .mtab tbody tr:hover { background: #f3f4f6; }
+  .mtab tr.sel { background: #dbeafe; }
+  .mtab tr.dim td { color: #b6bcc6; }
+  .bar { display: inline-block; height: 9px; background: var(--sold); border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .hot { color: var(--accent); font-weight: 600; }
+  @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 id="title">Продажи ЖК</h1>
+  <p class="sub">367 квартир в 6 корпусах, сделки со 2 марта по 30 сентября 2026. Все графики связаны: клик по строке справа, по корпусу или выделение недель внизу фильтрует остальные.</p>
+
+  <div class="facts" id="facts"></div>
+  <div class="filters" id="filters"></div>
+
+  <div class="grid">
+    <div>
+      <div class="card">
+        <h2>Схема корпусов: какие квартиры проданы</h2>
+        <div class="note">Одна ячейка — одна квартира: столбец — планировка, строка — этаж. Наведите, чтобы увидеть квартиру; клик по названию корпуса — фильтр.</div>
+        <div class="legend">
+          <span><i style="background:var(--sold)"></i>Продана</span>
+          <span><i style="background:repeating-linear-gradient(135deg,var(--sold) 0 4px,#fff 4px 5.5px)"></i>Продана со скидкой</span>
+          <span><i style="background:var(--free)"></i>Не продана</span>
+          <span><i style="background:var(--fade)"></i>Не входит в фильтр</span>
+        </div>
+        <div id="scheme"></div>
+      </div>
+      <div class="card">
+        <h2>Сделки по неделям</h2>
+        <div class="note" id="weeksNote">Выделите мышью диапазон недель, чтобы отфильтровать.</div>
+        <div id="weeks"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2>Однушки, двушки, трёшки</h2>
+        <div class="note">Продано и осталось, медиана дней от обращения до сделки</div>
+        <div id="rooms"></div>
+      </div>
+      <div class="card">
+        <h2>Менеджеры</h2>
+        <div class="note">Скидки — сколько денег отдано клиентам. Оранжевым — заметно хуже остальных.</div>
+        <div id="mgrs"></div>
+      </div>
+      <div class="card">
+        <h2>Вид из окна</h2>
+        <div class="note">Какие квартиры продаются хуже и требуют помощи</div>
+        <div id="views"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="tip"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="data.js"></script>
+<script>
+// ---------- подготовка ----------
+const DAY = 864e5;
+const START = new Date('2026-03-02'); // понедельник первой недели
+const weekOf = (s) => Math.floor((new Date(s) - START) / DAY / 7);
+
+const flats = FLATS.map((f) => ({
+  ...f,
+  sold: !!f.date,
+  week: f.date ? weekOf(f.date) : null,
+}));
+const NWEEKS = d3.max(flats, (f) => f.week) + 1;
+const ROOMS_LABEL = {1: '1-комн.', 2: '2-комн.', 3: '3-комн.', 4: '4-комн.'};
+
+const ru = d3.formatLocale({decimal: ',', thousands: ' ', grouping: [3], currency: ['', ' ₽']});
+const fInt = ru.format(',d');
+const bln = (v) => ru.format(',.2f')(v / 1e9) + ' млрд';
+const mln = (v) => ru.format(',.1f')(v / 1e6) + ' млн';
+const pct = (v) => Math.round(v * 100) + '%';
+const median = (a) => (a.length ? d3.median(a) : null);
+const fDays = (v) => (v == null ? '—' : String(v).replace('.', ','));
+const weekLabel = (i) => {
+  const a = new Date(+START + i * 7 * DAY), b = new Date(+a + 6 * DAY);
+  const o = {day: 'numeric', month: 'short'};
+  return a.toLocaleDateString('ru-RU', o) + ' – ' + b.toLocaleDateString('ru-RU', o);
+};
+
+// ---------- состояние фильтров ----------
+const S = {rooms: null, mgr: null, view: null, b: null, weeks: null};
+const FILTER_NAMES = {
+  rooms: (v) => ROOMS_LABEL[v],
+  mgr: (v) => v,
+  view: (v) => 'вид ' + v,
+  b: (v) => 'корпус ' + v,
+  weeks: (v) => v[0] === v[1] ? weekLabel(v[0]) : weekLabel(v[0]).split(' – ')[0] + ' – ' + weekLabel(v[1]).split(' – ')[1],
+};
+
+// квартира проходит все фильтры, кроме except
+function match(f, except) {
+  if (S.rooms != null && except !== 'rooms' && f.rooms !== S.rooms) return false;
+  if (S.view != null && except !== 'view' && f.view !== S.view) return false;
+  if (S.b != null && except !== 'b' && f.b !== S.b) return false;
+  if (S.mgr != null && except !== 'mgr' && f.mgr !== S.mgr) return false;
+  if (S.weeks != null && except !== 'weeks' && !(f.sold && f.week >= S.weeks[0] && f.week <= S.weeks[1])) return false;
+  return true;
+}
+const saleFilterOn = () => S.mgr != null || S.weeks != null;
+
+function toggle(key, val) {
+  S[key] = S[key] === val ? null : val;
+  renderAll();
+}
+
+// ---------- подсказка ----------
+const tip = d3.select('#tip');
+function showTip(ev, html) {
+  tip.html(html).style('opacity', 1);
+  const w = tip.node().offsetWidth, h = tip.node().offsetHeight;
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - 14;
+  if (y + h > innerHeight - 8) y = ev.clientY - h - 14;
+  tip.style('left', x + 'px').style('top', y + 'px');
+}
+const hideTip = () => tip.style('opacity', 0);
+
+function flatTip(f) {
+  let s = `<b>${f.id}</b> · корпус ${f.b}, ${f.fl} этаж<br>${f.rooms}-комн., ${String(f.area).replace('.', ',')} м², вид ${f.view}<br>` +
+    `Цена: ${mln(f.price)} (${fInt(f.ppm)} ₽/м²)<br>`;
+  if (f.sold) {
+    s += `Продана ${new Date(f.date).toLocaleDateString('ru-RU')}${f.disc ? `, <b>скидка ${mln(f.disc)}</b>` : ', без скидки'}<br>` +
+      `Менеджер: ${f.mgr}, ${f.days} дн. от обращения`;
+  } else s += '<b>Не продана</b>';
+  return s;
+}
+
+// ---------- заголовок: вывод из данных ----------
+(function title() {
+  const sold = flats.filter((f) => f.sold);
+  const disc = d3.sum(sold, (f) => f.disc);
+  const byM = d3.rollups(sold, (v) => d3.sum(v, (f) => f.disc), (f) => f.mgr).sort((a, b) => b[1] - a[1]);
+  const top = byM[0];
+  const last8 = sold.filter((f) => f.week >= NWEEKS - 8).length / 8;
+  document.getElementById('title').textContent =
+    `ЖК продан на ${pct(sold.length / flats.length)}, темп ровный — около ${Math.round(last8)} квартир в неделю; ` +
+    `${pct(top[1] / disc)} всех скидок дал один менеджер — ${top[0]}`;
+})();
+
+// ---------- фактоиды ----------
+function renderFacts() {
+  const sel = flats.filter((f) => match(f));
+  const sold = sel.filter((f) => f.sold);
+  const free = saleFilterOn() ? null : sel.filter((f) => !f.sold).length;
+  const rev = d3.sum(sold, (f) => f.sum);
+  const disc = d3.sum(sold, (f) => f.disc);
+  const list = d3.sum(sold, (f) => f.price);
+  const days = median(sold.map((f) => f.days));
+  const withDisc = sold.filter((f) => f.disc > 0).length;
+  // темп и прогноз только для всей выборки по времени
+  const soldNoWeek = flats.filter((f) => f.sold && match(f, 'weeks'));
+  const pace = soldNoWeek.filter((f) => f.week >= NWEEKS - 8).length / 8;
+  const items = [
+    ['Продано квартир', fInt(sold.length) + (free != null ? ` <small>из ${fInt(sold.length + free)} (${pct(sold.length / Math.max(1, sold.length + free))})</small>` : '')],
+    ['Выручка', bln(rev)],
+    ['Потеряно на скидках', mln(disc) + (list ? ` <small>${ru.format('.1%')(disc / list)} от прайса</small>` : ''), disc / Math.max(1, list) > 0.015],
+    ['Сделок со скидкой', `${fInt(withDisc)} <small>${sold.length ? pct(withDisc / sold.length) : ''}</small>`],
+    ['Медиана дней до сделки', days == null ? '—' : fInt(days)],
+  ];
+  if (free != null) {
+    items.push(['Темп, последние 8 недель', ru.format(',.1f')(pace) + ' <small>кв./нед.</small>']);
+    items.push(['Остаток распродастся за', pace ? `≈ ${Math.round(free / pace)} <small>нед.</small>` : '—']);
+  }
+  d3.select('#facts').html(items.map(([l, v, warn]) =>
+    `<div class="fact${warn ? ' warn' : ''}"><div class="lbl">${l}</div><div class="val">${v}</div></div>`).join(''));
+}
+
+function renderFilters() {
+  const box = d3.select('#filters').html('');
+  const keys = Object.keys(S).filter((k) => S[k] != null);
+  if (!keys.length) {
+    box.append('span').attr('class', 'hint').text('Фильтров нет — показаны все квартиры.');
+    return;
+  }
+  box.append('span').attr('class', 'hint').text('Фильтры:');
+  keys.forEach((k) => box.append('span').attr('class', 'chip').text(FILTER_NAMES[k](S[k]))
+    .on('click', () => { S[k] = null; renderAll(); }));
+  box.append('button').attr('class', 'reset').text('Сбросить все').on('click', () => {
+    Object.keys(S).forEach((k) => (S[k] = null));
+    renderAll();
+  });
+}
+
+// ---------- основной график: схема корпусов ----------
+const buildings = d3.groups(flats, (f) => f.b).sort((a, b) => d3.ascending(a[0], b[0])).map(([name, items]) => {
+  const layouts = d3.groups(items, (f) => f.layout)
+    .map(([layout, v]) => ({layout, rooms: v[0].rooms, area: v[0].area}))
+    .sort((a, b) => a.rooms - b.rooms || a.area - b.area || a.layout.localeCompare(b.layout));
+  const col = new Map(layouts.map((l, i) => [l.layout, i]));
+  items.forEach((f) => (f.col = col.get(f.layout)));
+  const groups = [];
+  layouts.forEach((l, i) => {
+    const last = groups[groups.length - 1];
+    if (last && last.rooms === l.rooms) last.to = i; else groups.push({rooms: l.rooms, from: i, to: i});
+  });
+  return {name, items, layouts, groups, maxFloor: d3.max(items, (f) => f.fl)};
+});
+const MINF = d3.min(flats, (f) => f.fl), MAXF = d3.max(flats, (f) => f.fl);
+
+function renderScheme() {
+  const el = document.getElementById('scheme');
+  const width = Math.max(el.clientWidth, 700);
+  const m = {top: 40, right: 4, bottom: 46, left: 30}, gap = 18;
+  const nCols = d3.sum(buildings, (b) => b.layouts.length);
+  const cw = Math.floor((width - m.left - m.right - gap * (buildings.length - 1)) / nCols);
+  const nF = MAXF - MINF + 1;
+  const ch = Math.max(8, Math.min(16, Math.round(cw * 0.55)));
+  const height = m.top + nF * ch + m.bottom;
+  const baseY = m.top + nF * ch;
+  const fy = (fl) => baseY - (fl - MINF + 1) * ch;
+
+  const svg = d3.select(el).html('').append('svg').attr('width', width).attr('height', height);
+
+  // этажи
+  const ax = svg.append('g').attr('fill', 'var(--muted)').style('font-size', '10px');
+  ax.append('text').attr('x', m.left - 6).attr('y', m.top - 6).attr('text-anchor', 'end').text('этаж');
+  for (let fl = MINF; fl <= MAXF; fl++) {
+    if (!(fl === MINF || fl === MAXF || fl % 5 === 0)) continue;
+    const y = fy(fl) + ch / 2;
+    ax.append('text').attr('x', m.left - 6).attr('y', y).attr('dy', '0.32em').attr('text-anchor', 'end').text(fl);
+    ax.append('line').attr('x1', m.left - 2).attr('x2', width - m.right).attr('y1', y).attr('y2', y)
+      .attr('stroke', 'var(--line)').attr('stroke-dasharray', '2 4');
+  }
+
+  let x0 = m.left;
+  buildings.forEach((b) => {
+    const bw = b.layouts.length * cw;
+    const top = fy(b.maxFloor);
+    const g = svg.append('g').attr('transform', `translate(${x0},0)`);
+    const inF = b.items.filter((f) => match(f, 'b'));
+    const soldF = inF.filter((f) => f.sold).length;
+    const isSel = S.b === b.name, dim = S.b != null && !isSel;
+
+    g.append('rect').attr('x', 0).attr('y', top).attr('width', bw).attr('height', baseY - top)
+      .attr('fill', isSel ? '#eef4ff' : '#fafafa').attr('stroke', isSel ? 'var(--sold)' : 'var(--line)').attr('rx', 2);
+    g.append('path').attr('d', `M0 ${top} L5 ${top - 6} L${bw - 5} ${top - 6} L${bw} ${top}`)
+      .attr('fill', 'none').attr('stroke', isSel ? 'var(--sold)' : 'var(--line)');
+
+    const all = b.items.length, allSold = b.items.filter((f) => f.sold).length;
+    const head = g.append('g').attr('class', 'bhead').on('click', () => toggle('b', b.name));
+    head.append('rect').attr('x', -2).attr('y', top - 34).attr('width', Math.max(bw, 90)).attr('height', 22).attr('fill', 'transparent');
+    const t = head.append('text').attr('y', top - 14).attr('fill', dim ? '#9ca3af' : 'var(--text)');
+    t.append('tspan').style('font-size', '14px').style('font-weight', 700).text(b.name);
+    t.append('tspan').attr('dx', 5).attr('fill', 'var(--muted)').style('font-size', '11px')
+      .text(`${pct(allSold / all)} · ${allSold}/${all}`);
+    head.on('mousemove', (ev) => showTip(ev, `Корпус <b>${b.name}</b>: продано ${allSold} из ${all} (${pct(allSold / all)})` +
+      (Object.values(S).some((v) => v != null) ? `<br>В фильтре: ${soldF} продано` : '') + '<br>Клик — фильтр по корпусу'))
+      .on('mouseleave', hideTip);
+
+    b.items.forEach((f) => {
+      const on = match(f) && (f.sold || !saleFilterOn());
+      const x = f.col * cw + 1, y = fy(f.fl) + 1, w = cw - 2, h = ch - 2;
+      const c = g.append('g').on('mousemove', (ev) => showTip(ev, flatTip(f))).on('mouseleave', hideTip);
+      c.append('rect').attr('x', x).attr('y', y).attr('width', w).attr('height', h).attr('rx', Math.min(3, h / 3))
+        .attr('fill', on ? (f.sold ? 'var(--sold)' : 'var(--free)') : 'var(--fade)');
+      if (on && f.disc > 0) {
+        c.append('line').attr('x1', x + 2).attr('y1', y + h - 2).attr('x2', x + w - 2).attr('y2', y + 2)
+          .attr('stroke', '#fff').attr('stroke-width', 1.5).attr('stroke-linecap', 'round').attr('pointer-events', 'none');
+      }
+    });
+
+    b.layouts.forEach((l, i) => g.append('text').attr('x', i * cw + cw / 2).attr('y', baseY + 13)
+      .attr('text-anchor', 'middle').attr('fill', 'var(--muted)').style('font-size', cw < 22 ? '9px' : '10px').text(Math.round(l.area)));
+    b.groups.forEach((gr) => {
+      const a = gr.from * cw + 1, z = (gr.to + 1) * cw - 1, y = baseY + 22;
+      g.append('path').attr('d', `M${a} ${y} L${a} ${y + 5} L${z} ${y + 5} L${z} ${y}`).attr('fill', 'none').attr('stroke', '#cbd0d8');
+      g.append('text').attr('x', (a + z) / 2).attr('y', y + 17).attr('text-anchor', 'middle').attr('fill', 'var(--muted)')
+        .style('font-size', '10px').text(z - a < 40 ? `${gr.rooms}к` : `${gr.rooms}-комн.`);
+    });
+    x0 += bw + gap;
+  });
+  svg.append('text').attr('x', m.left - 6).attr('y', baseY + 13).attr('text-anchor', 'end').attr('fill', 'var(--muted)')
+    .style('font-size', '10px').text('м²');
+}
+
+// ---------- динамика по неделям ----------
+function renderWeeks() {
+  const el = document.getElementById('weeks');
+  const width = Math.max(el.clientWidth, 600), height = 190;
+  const m = {top: 10, right: 10, bottom: 28, left: 30};
+  const sold = flats.filter((f) => f.sold && match(f, 'weeks'));
+  const data = d3.range(NWEEKS).map((i) => {
+    const v = sold.filter((f) => f.week === i);
+    return {i, plain: v.filter((f) => !f.disc).length, disc: v.filter((f) => f.disc > 0).length, n: v.length,
+      rev: d3.sum(v, (f) => f.sum), lost: d3.sum(v, (f) => f.disc)};
+  });
+  data.forEach((d, k) => {
+    const w = data.slice(Math.max(0, k - 3), k + 1);
+    d.avg = d3.mean(w, (x) => x.n);
+  });
+
+  const x = d3.scaleBand().domain(d3.range(NWEEKS)).range([m.left, width - m.right]).padding(0.18);
+  const y = d3.scaleLinear().domain([0, Math.max(4, d3.max(data, (d) => d.n))]).nice().range([height - m.bottom, m.top]);
+  const svg = d3.select(el).html('').append('svg').attr('width', width).attr('height', height);
+
+  svg.append('defs').html(`<pattern id="hatch" patternUnits="userSpaceOnUse" width="5" height="5" patternTransform="rotate(45)">
+    <rect width="5" height="5" fill="#2a78d6"/><line x1="0" y1="0" x2="0" y2="5" stroke="#fff" stroke-width="1.6"/></pattern>`);
+
+  svg.append('g').attr('transform', `translate(${m.left},0)`)
+    .call(d3.axisLeft(y).ticks(4).tickSize(-(width - m.left - m.right)))
+    .call((g) => g.select('.domain').remove())
+    .call((g) => g.selectAll('line').attr('stroke', 'var(--line)'))
+    .call((g) => g.selectAll('text').attr('fill', 'var(--muted)'));
+
+  // подписи месяцев
+  const months = d3.timeMonths(new Date('2026-03-01'), new Date('2026-10-01'));
+  months.forEach((mo) => {
+    const i = Math.max(0, weekOf(d3.timeMonday.ceil(mo)));
+    if (i >= NWEEKS || x(i) > width - m.right - 50) return;
+    svg.append('text').attr('x', x(i)).attr('y', height - 8).attr('fill', 'var(--muted)').style('font-size', '11px')
+      .text(mo.toLocaleDateString('ru-RU', {month: 'long'}));
+    svg.append('line').attr('x1', x(i) - 2).attr('x2', x(i) - 2).attr('y1', height - m.bottom).attr('y2', height - m.bottom + 6).attr('stroke', '#cbd0d8');
+  });
+
+  const inSel = (i) => !S.weeks || (i >= S.weeks[0] && i <= S.weeks[1]);
+  const bars = svg.append('g').selectAll('g').data(data).join('g').attr('opacity', (d) => (inSel(d.i) ? 1 : 0.3));
+  bars.append('rect').attr('x', (d) => x(d.i)).attr('width', x.bandwidth())
+    .attr('y', (d) => y(d.plain)).attr('height', (d) => y(0) - y(d.plain)).attr('fill', 'var(--sold)');
+  bars.append('rect').attr('x', (d) => x(d.i)).attr('width', x.bandwidth())
+    .attr('y', (d) => y(d.n)).attr('height', (d) => y(d.plain) - y(d.n)).attr('fill', 'url(#hatch)');
+
+  svg.append('path').datum(data).attr('fill', 'none').attr('stroke', '#111827').attr('stroke-width', 1.6)
+    .attr('d', d3.line().x((d) => x(d.i) + x.bandwidth() / 2).y((d) => y(d.avg)).curve(d3.curveMonotoneX));
+  svg.append('text').attr('x', width - m.right).attr('y', m.top + 2).attr('text-anchor', 'end').attr('fill', '#111827')
+    .style('font-size', '11px').text('— среднее за 4 недели');
+
+  // кисть для выбора недель
+  const brush = d3.brushX().extent([[m.left, m.top], [width - m.right, height - m.bottom]])
+    .on('end', (ev) => {
+      if (!ev.sourceEvent) return;
+      if (!ev.selection) { if (S.weeks) { S.weeks = null; renderAll(); } return; }
+      const [a, b] = ev.selection;
+      const idx = d3.range(NWEEKS).filter((i) => x(i) + x.bandwidth() > a && x(i) < b);
+      S.weeks = idx.length ? [idx[0], idx[idx.length - 1]] : null;
+      renderAll();
+    });
+  const bg = svg.append('g').call(brush);
+  if (S.weeks) bg.call(brush.move, [x(S.weeks[0]) - 1, x(S.weeks[1]) + x.bandwidth() + 1]);
+  bg.select('.overlay').on('mousemove.tip', (ev) => {
+    const [mx] = d3.pointer(ev);
+    const i = Math.floor((mx - m.left) / x.step());
+    const d = data[i];
+    if (!d) return hideTip();
+    showTip(ev, `<b>${weekLabel(i)}</b><br>Сделок: ${d.n}${d.disc ? ` (со скидкой ${d.disc})` : ''}<br>Выручка: ${bln(d.rev)}` +
+      (d.lost ? `<br>Скидки: ${mln(d.lost)}` : ''));
+  }).on('mouseleave.tip', hideTip);
+
+  // подпись: что происходит с продажами
+  const first = d3.sum(data.slice(0, 8), (d) => d.n) / 8, last = d3.sum(data.slice(-8), (d) => d.n) / 8;
+  const trend = last > first * 1.15 ? 'ускоряются' : last < first * 0.85 ? 'замедляются' : 'идут ровно';
+  d3.select('#weeksNote').html(`Продажи ${trend}: ${ru.format(',.1f')(first)} кв./нед. в первые 8 недель и ${ru.format(',.1f')(last)} — в последние 8. ` +
+    `Штриховка — сделки со скидкой. Выделите мышью диапазон недель, чтобы отфильтровать.`);
+}
+
+// ---------- срез: строки со столбиком продано/осталось ----------
+function sliceRows(elId, key, cats, labelOf) {
+  const el = document.getElementById(elId);
+  const width = Math.max(el.clientWidth, 300);
+  const rowH = 24, labelW = Math.min(150, width * 0.4), right = 92;
+  const rows = cats.map((c) => {
+    const items = flats.filter((f) => f[key] === c && match(f, key));
+    const sold = items.filter((f) => f.sold);
+    const free = saleFilterOn() ? 0 : items.filter((f) => !f.sold).length;
+    const all = flats.filter((f) => f[key] === c);
+    return {c, plain: sold.filter((f) => !f.disc).length, disc: sold.filter((f) => f.disc > 0).length, sold: sold.length, free,
+      share: all.filter((f) => f.sold).length / all.length, total: all.length, days: median(sold.map((f) => f.days))};
+  });
+  const maxN = d3.max(rows, (r) => r.sold + r.free) || 1;
+  const x = d3.scaleLinear().domain([0, maxN]).range([0, width - labelW - right]);
+  const svg = d3.select(el).html('').append('svg').attr('width', width).attr('height', rows.length * rowH + 18);
+  svg.append('text').attr('x', width).attr('y', 10).attr('text-anchor', 'end').attr('fill', 'var(--muted)').style('font-size', '10px')
+    .text('продано · медиана дн.');
+  const g = svg.selectAll('.row').data(rows).join('g')
+    .attr('class', (r) => 'row' + (S[key] === r.c ? ' sel' : ''))
+    .attr('transform', (r, i) => `translate(0,${16 + i * rowH})`)
+    .on('click', (ev, r) => toggle(key, r.c))
+    .on('mousemove', (ev, r) => showTip(ev, `<b>${labelOf(r.c)}</b><br>Всего ${r.total}, продано за период ${pct(r.share)}` +
+      `<br>В текущем фильтре: продано ${r.sold}${r.disc ? ` (со скидкой ${r.disc})` : ''}${saleFilterOn() ? '' : `, осталось ${r.free}`}` +
+      (r.days != null ? `<br>Медиана дней до сделки: ${fDays(r.days)}` : '') + '<br>Клик — фильтр'))
+    .on('mouseleave', hideTip);
+  const dim = (r) => S[key] != null && S[key] !== r.c;
+  g.append('rect').attr('class', 'rowbg').attr('width', width).attr('height', rowH - 2).attr('fill', 'transparent').attr('rx', 3);
+  g.append('text').attr('x', 4).attr('y', rowH / 2).attr('dy', '0.32em').attr('fill', (r) => (dim(r) ? '#9ca3af' : 'var(--text)'))
+    .text((r) => labelOf(r.c));
+  const bx = labelW;
+  g.append('rect').attr('x', bx).attr('y', 5).attr('height', rowH - 12).attr('width', (r) => x(r.plain)).attr('fill', 'var(--sold)').attr('opacity', (r) => (dim(r) ? 0.35 : 1));
+  g.append('rect').attr('x', (r) => bx + x(r.plain)).attr('y', 5).attr('height', rowH - 12).attr('width', (r) => x(r.disc)).attr('fill', 'url(#hatch)').attr('opacity', (r) => (dim(r) ? 0.35 : 1));
+  g.append('rect').attr('x', (r) => bx + x(r.sold)).attr('y', 5).attr('height', rowH - 12).attr('width', (r) => x(r.free)).attr('fill', 'var(--free)').attr('opacity', (r) => (dim(r) ? 0.35 : 1));
+  g.append('text').attr('x', width - 4).attr('y', rowH / 2).attr('dy', '0.32em').attr('text-anchor', 'end')
+    .attr('fill', (r) => (r.share < 0.6 ? 'var(--accent)' : 'var(--muted)')).style('font-variant-numeric', 'tabular-nums')
+    .text((r) => `${pct(r.share)} · ${fDays(r.days)}`);
+}
+
+// ---------- менеджеры: таблица ----------
+function renderMgrs() {
+  const sold = flats.filter((f) => f.sold && match(f, 'mgr'));
+  const names = [...new Set(flats.filter((f) => f.mgr).map((f) => f.mgr))];
+  const rows = names.map((n) => {
+    const v = sold.filter((f) => f.mgr === n);
+    const list = d3.sum(v, (f) => f.price);
+    return {n, cnt: v.length, rev: d3.sum(v, (f) => f.sum), lost: d3.sum(v, (f) => f.disc),
+      lostPct: list ? d3.sum(v, (f) => f.disc) / list : 0, discShare: v.length ? v.filter((f) => f.disc > 0).length / v.length : 0,
+      days: median(v.map((f) => f.days))};
+  }).sort((a, b) => b.rev - a.rev);
+  const maxC = d3.max(rows, (r) => r.cnt) || 1;
+  const medLost = d3.median(rows.filter((r) => r.cnt), (r) => r.lostPct) || 0;
+  const medDays = d3.median(rows.filter((r) => r.cnt), (r) => r.days) || 0;
+  const html = `<table class="mtab"><thead><tr><th>Менеджер</th><th style="text-align:left">Сделок</th><th>Выручка</th>
+    <th>Скидки</th><th>% от прайса</th><th>Дней</th></tr></thead><tbody>` +
+    rows.map((r) => `<tr data-n="${r.n}" class="${S.mgr === r.n ? 'sel' : S.mgr ? 'dim' : ''}">
+      <td>${r.n}</td>
+      <td style="text-align:left"><span class="bar" style="width:${Math.round((r.cnt / maxC) * 60)}px"></span>${r.cnt}</td>
+      <td>${r.cnt ? ru.format(',.2f')(r.rev / 1e9) : '—'}</td>
+      <td class="${r.lostPct > medLost * 2 && r.lost > 0 ? 'hot' : ''}">${r.cnt ? ru.format(',.1f')(r.lost / 1e6) : '—'}</td>
+      <td class="${r.lostPct > medLost * 2 && r.lost > 0 ? 'hot' : ''}">${r.cnt ? ru.format('.1%')(r.lostPct) : '—'}</td>
+      <td class="${r.days != null && r.days > medDays * 1.4 ? 'hot' : ''}">${fDays(r.days)}</td></tr>`).join('') +
+    `</tbody></table><div class="note" style="margin:6px 0 0">Выручка — млрд ₽, скидки — млн ₽, дни — медиана от обращения до сделки.</div>`;
+  d3.select('#mgrs').html(html).selectAll('tbody tr').on('click', function () { toggle('mgr', this.dataset.n); });
+}
+
+// ---------- всё вместе ----------
+const VIEWS = d3.groups(flats, (f) => f.view).sort((a, b) => b[1].length - a[1].length).map((d) => d[0]);
+function renderAll() {
+  hideTip();
+  renderFacts();
+  renderFilters();
+  renderWeeks(); // тут же объявлен паттерн штриховки
+  renderScheme();
+  sliceRows('rooms', 'rooms', [1, 2, 3, 4], (c) => ROOMS_LABEL[c]);
+  renderMgrs();
+  sliceRows('views', 'view', VIEWS, (c) => c);
+}
+renderAll();
+let rt;
+addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
+</script>
+</body>
+</html>
