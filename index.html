@@ -97,6 +97,11 @@
         <div class="note">Тёмно-синим — сделки со скидкой, жёлтая линия — среднее за 4 недели. Выделите мышью диапазон недель, чтобы отфильтровать.</div>
         <div id="weeks"></div>
       </div>
+      <div class="card">
+        <h2>Выручка по неделям</h2>
+        <div class="note">Млн ₽ по дате сделки. Тёмно-синим — выручка со сделок со скидкой, жёлтая линия — среднее за 4 недели.</div>
+        <div id="weeksrev"></div>
+      </div>
     </div>
 
     <div>
@@ -319,28 +324,33 @@ function renderScheme() {
 }
 
 // ---------- динамика по неделям ----------
-function renderWeeks() {
-  const el = document.getElementById('weeks');
-  const width = Math.max(el.clientWidth, 600), height = 190;
-  const m = {top: 10, right: 10, bottom: 28, left: 30};
+function renderWeeks(elId, mode) {
+  const el = document.getElementById(elId);
+  const money = mode === 'rev';
+  const width = Math.max(el.clientWidth, 600), height = money ? 160 : 190;
+  const m = {top: 10, right: 10, bottom: 28, left: money ? 42 : 30};
   const sold = flats.filter((f) => f.sold && match(f, 'weeks'));
   const data = d3.range(NWEEKS).map((i) => {
     const v = sold.filter((f) => f.week === i);
-    return {i, plain: v.filter((f) => !f.disc).length, disc: v.filter((f) => f.disc > 0).length, n: v.length,
-      rev: d3.sum(v, (f) => f.sum), lost: d3.sum(v, (f) => f.disc)};
+    const noDisc = v.filter((f) => !f.disc), withDisc = v.filter((f) => f.disc > 0);
+    return {i, plain: noDisc.length, disc: withDisc.length, n: v.length,
+      rev: d3.sum(v, (f) => f.sum), revPlain: d3.sum(noDisc, (f) => f.sum), lost: d3.sum(v, (f) => f.disc)};
   });
+  // что рисуем: число сделок или выручку
+  const lo = (d) => (money ? d.revPlain : d.plain), hi = (d) => (money ? d.rev : d.n);
   data.forEach((d, k) => {
     const w = data.slice(Math.max(0, k - 3), k + 1);
-    d.avg = d3.mean(w, (x) => x.n);
+    d.avg = d3.mean(w, hi);
   });
 
   const x = d3.scaleBand().domain(d3.range(NWEEKS)).range([m.left, width - m.right]).padding(0.18);
-  const y = d3.scaleLinear().domain([0, Math.max(4, d3.max(data, (d) => d.n))]).nice().range([height - m.bottom, m.top]);
+  const y = d3.scaleLinear().domain([0, Math.max(money ? 1e8 : 4, d3.max(data, hi))]).nice().range([height - m.bottom, m.top]);
   const svg = d3.select(el).html('').append('svg').attr('width', width).attr('height', height);
 
 
   svg.append('g').attr('transform', `translate(${m.left},0)`)
-    .call(d3.axisLeft(y).ticks(4).tickSize(-(width - m.left - m.right)))
+    .call(d3.axisLeft(y).ticks(4).tickSize(-(width - m.left - m.right))
+      .tickFormat(money ? (v) => ru.format(',.0f')(v / 1e6) : null))
     .call((g) => g.select('.domain').remove())
     .call((g) => g.selectAll('line').attr('stroke', 'var(--line)'))
     .call((g) => g.selectAll('text').attr('fill', 'var(--muted)'));
@@ -358,9 +368,9 @@ function renderWeeks() {
   const inSel = (i) => !S.weeks || (i >= S.weeks[0] && i <= S.weeks[1]);
   const bars = svg.append('g').selectAll('g').data(data).join('g').attr('opacity', (d) => (inSel(d.i) ? 1 : 0.3));
   bars.append('rect').attr('x', (d) => x(d.i)).attr('width', x.bandwidth())
-    .attr('y', (d) => y(d.plain)).attr('height', (d) => y(0) - y(d.plain)).attr('fill', 'var(--sold)');
+    .attr('y', (d) => y(lo(d))).attr('height', (d) => y(0) - y(lo(d))).attr('fill', 'var(--sold)');
   bars.append('rect').attr('x', (d) => x(d.i)).attr('width', x.bandwidth())
-    .attr('y', (d) => y(d.n)).attr('height', (d) => y(d.plain) - y(d.n)).attr('fill', 'var(--disc)');
+    .attr('y', (d) => y(hi(d))).attr('height', (d) => y(lo(d)) - y(hi(d))).attr('fill', 'var(--disc)');
 
   svg.append('path').datum(data).attr('fill', 'none').attr('stroke', '#e0a100').attr('stroke-width', 2)
     .attr('d', d3.line().x((d) => x(d.i) + x.bandwidth() / 2).y((d) => y(d.avg)).curve(d3.curveMonotoneX));
@@ -467,7 +477,8 @@ function renderAll() {
   hideTip();
   renderFacts();
   renderFilters();
-  renderWeeks();
+  renderWeeks('weeks', 'n');
+  renderWeeks('weeksrev', 'rev');
   renderScheme();
   sliceRows('rooms', 'rooms', [1, 2, 3, 4], (c) => ROOMS_LABEL[c]);
   renderMgrs();
